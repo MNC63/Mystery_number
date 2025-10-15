@@ -23,8 +23,11 @@ GREEN = (50, 200, 50)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Mystery Number Game")
 
+# Clock
+clock = pygame.time.Clock()
 
 # UI Class
+
 
 class InputBox:
     def __init__(self, x, y, w, h, font, text=''):
@@ -107,32 +110,132 @@ class MysteryNumberGame:
         self.state = "menu"
         self.difficulty = "Normal"
         self.input_box = InputBox(200, 260, 200, 40, FONT)
+        self.check_btn = Button("Play Again", 200, 320,
+                                200, 40, FONT, base_color=BLUE)
+        self.playagain_btn = Button(
+            "Play Again", 200, 320, 200, 40, FONT, base_color=BLUE)
+
+        # Menu Buttons
+        self.menu_buttons = []
+        start_y = 180
+        for i, diff in enumerate(DIFFICULTY.keys()):
+            btn = Button(diff, 200, start_y + i * 60, 200, 48, FONT)
+            self.menu_buttons.append((diff, btn))
+
+        # Game State Variables
+        self.target = None
+        self.attempts = 0
+        self.max_attempts = 7
+        self.max_range = 100
+        self.message = "Choose difficulty and start"
+        self.best_score = None
+
+    def start_game(self, diff_name):
+        cfg = DIFFICULTY[diff_name]
+        self.difficulty = diff_name
+        self.max_range = cfg["range"]
+        self.max_attempts = cfg["attempts"]
+        self.target = random.randint(1, self.max_range)
+        self.attempts = 0
+        self.message = f"Guess a number between 1 and {self.max_range}"
+        self.input_box.text = ''
+        self.input_box.txt_surface = FONT.render('', True, BLACK)
+        self.state = "playing"
+
+    def check_guess(self, guess_str):
+        if not guess_str:
+            self.message = "⚠️ Enter a number"
+            return
+        try:
+            g = int(guess_str)
+        except ValueError:
+            self.message = "⚠️ Invalid number!"
+            return
+
+        if g < 1 or g > self.max_range:
+            self.message = f"⚠️ Number must be 1 - {self.max_range}"
+            return
+
+        self.attempts += 1
+
+        if g == self.target:
+            self.message = f"Correct! You won in {self.attempts} attempts!"
+            self.state = "end"
+            if self.best_score is None or self.attempts < self.best_score:
+                self.best_score = self.attempts
+
+        elif g < self.target:
+            self.message = "Higher"
+        else:
+            self.message = "Lower"
+        if self.attempts > self.max_attempts and self.state != "end":
+            self.message = f"Out of attempts! The number was {self.target}"
+            self.state = "end"
+
+    def handle_event(self, event):
+        if self.state == "menu":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for diff_name, btn in self.menu_buttons:
+                    if btn.is_clicked(event.pos):
+                        self.start_game(diff_name)
+        elif self.state == "playing":
+            submitted = self.input_box.handle_event(event)
+            if submitted is not None:
+                self.check_guess(submitted)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.check_btn.is_clicked(event.pos):
+                    self.check_guess(self.input_box.text)
+        elif self.state == "end":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.playagain_btn.is_clicked(event.pos):
+                    self.state = "menu"
+
+    def update(self, dt):
+        pass
+
+    def draw(self):
+        self.screen.fill(WHITE)
+        if self.state == "menu":
+            title = BIG_FONT.render("Mystery Number", True, BLACK)
+            self.screen.blit(title, ((WIDTH - title.get_width()) // 2, 80))
+            subtitle = FONT.render("Choose difficulty:", True, BLACK)
+            self.screen.blit(subtitle, (220, 140))
+            for _, btn in self.menu_buttons:
+                btn.draw(self.screen)
+        elif self.state == "playing":
+            header = FONT.render(
+                f"Difficulty: {self.difficulty} Attempts: {self.attempts}/{self.max_attempts}", True, BLACK)
+            self.screen.blit(header, (20, 30))
+            self.input_box.draw(self.screen)
+            self.check_btn.draw(self.screen)
+
+            # Message
+            msg_color = RED if "⚠️" in self.message or "Out of" in self.message else BLACK
+            msg = FONT.render(self.message, True, msg_color)
+            self.screen.blit(msg, (50, 200))
+        elif self.state == "end":
+            end_msg = BIG_FONT.render(self.message, True, BLACK)
+            self.screen.blit(
+                end_msg, ((WIDTH - end_msg.get_width()) // 2, 180))
+            self.playagain_btn.draw(self.screen)
+            if self.best_score is not None:
+                best = FONT.render(
+                    f"Best: {self.best_score} tries", True, BLACK)
+                self.screen.blit(best, (20, 20))
 
 
 # Main Loop
-clock = pygame.time.Clock()
-input_box = InputBox(200, 250, 200, 50, FONT)
-button = Button("PLAY", 220, 400, 160, 60, FONT)
-# game = MysteryNumberGame()
+game = MysteryNumberGame(screen)
 
 while True:
+    dt = clock.tick(30)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if button.is_clicked(event.pos):
-                print("Button clicked!")
+        game.handle_event(event)
 
-        # Event InputBox
-        submitted = input_box.handle_event(event)
-        if submitted is not None:
-            print("You Entered: ", submitted)
-
-        # Draw
-        screen.fill(BLACK)
-        input_box.draw(screen)
-        button.draw(screen)
-
+    # Draw
+    game.update(dt)
+    game.draw()
     pygame.display.flip()
-    clock.tick(30)
