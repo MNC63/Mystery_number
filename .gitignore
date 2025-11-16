@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+*.egg*
+.env
+# Binaries
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+
+# Auto-generated files
+*.vscode/
+*.log
